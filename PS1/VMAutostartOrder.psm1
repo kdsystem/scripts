@@ -82,26 +82,27 @@ function Set-VMAutostartOrder {
 	$lines = Import-csv -Delimiter ";" $FileName
 	foreach ($line in $lines) {
 		$vi_server = $($line.VMHost)
+		$answer = ""
 		if ($vi_server -ne $vi_server_old) {
 			Write-Host "Обрабатываем VM's на сервере",$vi_server
 			if ($vi_server_old -ne "") {
 				Disconnect-VIServer $vi_server_old -Confirm:$False
 			}
-		$next_count=0
-		#Connect-VIServer -Server $vi_server -Protocol https -User $vi_username -Password $vi_password
-		Connect-VIServer -Server $vi_server -Protocol https -Credential ( Get-Credential)
-		$VMHostStartPolicy = Get-VMHostStartPolicy $vi_server | Select-Object -ExpandProperty Enabled
-		if ($VMHostStartPolicy -eq $False) {
-			Write-Host "Для продолжения работы нужно включить автостарт на хосте"$vi_server". Включить?"
-			$answer = Read-Host "Yes or No"
-			while("yes","no" -notcontains $answer){
+			$next_count=0
+			#Connect-VIServer -Server $vi_server -Protocol https -User $vi_username -Password $vi_password
+			Connect-VIServer -Server $vi_server -Protocol https -Credential ( Get-Credential) | Out-Null
+			$VMHostStartPolicy = Get-VMHostStartPolicy $vi_server | Select-Object -ExpandProperty Enabled
+			if ($VMHostStartPolicy -eq $False) {
+				Write-Host "Для продолжения работы нужно включить автостарт на хосте"$vi_server". Включить?"
 				$answer = Read-Host "Yes or No"
+				while("yes","no" -notcontains $answer){
+					$answer = Read-Host "Yes or No"
+				}
 			}
-		}
-		if ($answer -eq "Yes" -Or $answer -eq "yes") {
-			Get-VMHost $vi_server | Get-VMHostStartPolicy | Set-VMHostStartPolicy -Enabled:$true | Out-Null
-			Write-Host "Автостарт на хосте"$vi_server" теперь Включен"
-		}
+			if ($answer.ToLower() -eq "yes") {
+				Get-VMHost $vi_server | Get-VMHostStartPolicy | Set-VMHostStartPolicy -Enabled:$true | Out-Null
+				Write-Host "Автостарт на хосте"$vi_server" теперь Включен"
+			}
 			$vi_server_old = $vi_server
 		}
 		# Если пользователь отказался включить Автостарт, пропускаем этот хост
@@ -113,7 +114,8 @@ function Set-VMAutostartOrder {
 			$VMStartDelay = $($line.VMStartDelay)
 			$VMStopDelay = $($line.VMStopDelay)
 			if ($($line.VMHeartBeat) -eq "TRUE") {
-				$VMHeartBeat = $true}
+				$VMHeartBeat = $true
+			}
 			else {$VMHeartBeat = $false}
 			#Если VMStartAction=PowerOn
 			if ($VMStartAction.trim() -eq "PowerOn"){
