@@ -5,7 +5,7 @@
 .DESCRIPTION
 Предназначен для манипулирвоания очередью автострата VM на esxi или VCenter от имени указанного пользователя.
 
-.PARAMETER esxi_server 
+.PARAMETER Server 
 Имя или IP адрес целевого хоста (esxi или VCenter).
 
 .PARAMETER FileName
@@ -19,17 +19,15 @@ Get - формируется файл
 Set - параметры заливаются в указанный хост
 
 .EXAMPLE
-PS c:\> Get-VMAutostartOrder spbvtc03 d:\3.csv
-PS c:\> Set-VMAutostartOrder spbvtc03 d:\3.csv
+PS c:\> Import-Module 'C:\Program Files (x86)\VMware\Infrastructure\PowerCLI\Modules\VMware.kdsystem\сredential1.psm1'
+PS c:\> Get-VMAutostartOrder -Server 172.17.10.121,172.17.10.127 d:\3.csv
+PS c:\> Set-VMAutostartOrder d:\3.csv
 #>
-
-
-#Import-Module 'C:\Program Files (x86)\VMware\Infrastructure\PowerCLI\Modules\VMware.kdsystem\сredential1.psm1'
 
 function Get-VMAutostartOrder {
 	param (
 		[parameter(Mandatory=$true,ValueFromPipeline=$true)]
-        [string[]]$esxi_server,
+        [string[]]$Server,
 		
 		[parameter(Mandatory=$true,ValueFromPipeline=$false)]
         [string]$FileName
@@ -37,17 +35,16 @@ function Get-VMAutostartOrder {
 	Begin {
 		#Очистим файл, если он есть
 		New-Item -Path $FileName -ItemType "file" -Force | Out-Null
-
 	}
 	Process {
-		ForEach ($vi_server in $esxi_server) {
+		ForEach ($vi_server in $Server) {
 			Write-Host "Обрабатываем",$vi_server
 			#Подключимся к серверу
-			#Connect-VIServer -Server $esxi_server -Protocol https -User $esxi_username -Password $esxi_userpassword | Out-Null
-			Connect-VIServer -Server $vi_server -Protocol https -Credential ( Get-Credential) | Out-Null
+			Connect-VIServer -Server $vi_server -Protocol https | Out-Null
 			#Перебор всех VM
 			$results = @() 
 			ForEach ($vm in (Get-VM)) {
+				Write-Host "Экспортируем инфо по хосту"$vm.Name
 				$state_lines = Get-VMStartPolicy $vm
 				$vm_StartAction = Get-VMStartPolicy $vm | Select-Object -ExpandProperty StartAction
 				$vm_VMHeartBeat = Get-VMStartPolicy $vm | Select-Object -ExpandProperty WaitForHeartBeat
@@ -79,7 +76,7 @@ function Set-VMAutostartOrder {
 	$next_count=0
 	$vi_server_old = ""
 	#Загрузим данные из файла
-	$lines = Import-csv -Delimiter ";" $FileName
+	$lines = Import-csv -Delimiter ";" $FileName |sort VC, VMHost, VMStartAction, VMStartOrder
 	foreach ($line in $lines) {
 		$vi_server = $($line.VMHost)
 		$answer = ""
@@ -89,13 +86,12 @@ function Set-VMAutostartOrder {
 				Disconnect-VIServer $vi_server_old -Confirm:$False
 			}
 			$next_count=0
-			#Connect-VIServer -Server $vi_server -Protocol https -User $vi_username -Password $vi_password
-			Connect-VIServer -Server $vi_server -Protocol https -Credential ( Get-Credential) | Out-Null
+			Connect-VIServer -Server $vi_server -Protocol https | Out-Null
 			$VMHostStartPolicy = Get-VMHostStartPolicy $vi_server | Select-Object -ExpandProperty Enabled
 			if ($VMHostStartPolicy -eq $False) {
 				Write-Host "Для продолжения работы нужно включить автостарт на хосте"$vi_server". Включить?"
 				$answer = Read-Host "Yes or No"
-				while("yes","no" -notcontains $answer){
+				while("Yes","No" -notcontains $answer){
 					$answer = Read-Host "Yes or No"
 				}
 			}
@@ -113,6 +109,7 @@ function Set-VMAutostartOrder {
 			$VMStartOrder = $($line.VMStartOrder)
 			$VMStartDelay = $($line.VMStartDelay)
 			$VMStopDelay = $($line.VMStopDelay)
+			Write-Host "Обрабатываем хост"$vmname
 			if ($($line.VMHeartBeat) -eq "TRUE") {
 				$VMHeartBeat = $true
 			}
@@ -127,14 +124,14 @@ function Set-VMAutostartOrder {
 				}
 				else {
 				#Ситуация с заданным Order
-					$next_count = $next_count + 1
-					if ($next_count -eq $VMStartOrder) {
+					#$next_count = $next_count + 1
+					#if ($next_count -eq $VMStartOrder) {
 						$vmStartPolicy = Get-VMStartPolicy -VM $vmname
 						Set-VMStartPolicy -StartPolicy $vmstartpolicy -StartAction PowerOn -StartOrder $VMStartOrder -StartDelay $VMStartDelay -StopDelay $VMStopDelay -WaitForHeartBeat:$VMHeartBeat| Out-Null
-					}
-					else {
-						Write-Host "Указан неправильный StartOrder для VM=",$vmname," должен быть",$next_count
-					}
+					#}
+					#else {
+					#	Write-Host "Указан неправильный StartOrder для VM=",$vmname," должен быть",$next_count
+					#}
 				}
 			}		
 			else {
