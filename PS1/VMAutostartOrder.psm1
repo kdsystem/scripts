@@ -19,7 +19,7 @@ Get - формируется файл
 Set - параметры заливаются в указанный хост
 
 .EXAMPLE
-PS c:\> Import-Module 'C:\Program Files (x86)\VMware\Infrastructure\PowerCLI\Modules\VMware.kdsystem\сredential1.psm1'
+PS c:\> Import-Module 'D:\WORK\CSA\virtualization\VMAutostartOrder.psm1'
 PS c:\> Get-VMAutostartOrder -Server 172.17.10.121,172.17.10.127 d:\3.csv
 PS c:\> Set-VMAutostartOrder d:\3.csv
 #>
@@ -124,14 +124,8 @@ function Set-VMAutostartOrder {
 				}
 				else {
 				#Ситуация с заданным Order
-					#$next_count = $next_count + 1
-					#if ($next_count -eq $VMStartOrder) {
-						$vmStartPolicy = Get-VMStartPolicy -VM $vmname
-						Set-VMStartPolicy -StartPolicy $vmstartpolicy -StartAction PowerOn -StartOrder $VMStartOrder -StartDelay $VMStartDelay -StopDelay $VMStopDelay -WaitForHeartBeat:$VMHeartBeat| Out-Null
-					#}
-					#else {
-					#	Write-Host "Указан неправильный StartOrder для VM=",$vmname," должен быть",$next_count
-					#}
+					$vmStartPolicy = Get-VMStartPolicy -VM $vmname
+					Set-VMStartPolicy -StartPolicy $vmstartpolicy -StartAction PowerOn -StartOrder $VMStartOrder -StartDelay $VMStartDelay -StopDelay $VMStopDelay -WaitForHeartBeat:$VMHeartBeat| Out-Null
 				}
 			}		
 			else {
@@ -142,8 +136,7 @@ function Set-VMAutostartOrder {
 				}
 				else {
 					$vmStartPolicy = Get-VMStartPolicy -VM $vmname
-					Set-VMStartPolicy -StartPolicy $vmstartpolicy -StartAction None | Out-Null
-					
+					Set-VMStartPolicy -StartPolicy $vmstartpolicy -StartAction None | Out-Null					
 				}
 			}		
 		}
