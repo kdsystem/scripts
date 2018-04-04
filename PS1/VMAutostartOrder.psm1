@@ -34,41 +34,44 @@ function Get-VMAutostartOrder {
 		[parameter(Mandatory=$true,ValueFromPipeline=$false)]
         [string]$FileName
 	)
-		
-	Write-Host "Обрабатываем",$esxi_server
-	#Подключимся к серверу
-	#Connect-VIServer -Server $esxi_server -Protocol https -User $esxi_username -Password $esxi_userpassword | Out-Null
-	Connect-VIServer -Server $esxi_server -Protocol https -Credential ( Get-Credential) | Out-Null
-	#Перебор всех VM
-	$results = @() 
-	#Очистим файл, если он есть
-	New-Item -Path $FileName -ItemType "file" -Force | Out-Null
-	ForEach ($vm in (Get-VM)) {
-		$state_lines = Get-VMStartPolicy $vm
-		$vm_StartAction = Get-VMStartPolicy $vm | Select-Object -ExpandProperty StartAction
-		$vm_VMHeartBeat = Get-VMStartPolicy $vm | Select-Object -ExpandProperty WaitForHeartBeat
-		$details = @{   
-			VC				= $esxi_server
-			VMHost 		 	= $vm.vmhost
-			VMName	      	= $vm.Name
-			VMStartAction	= $vm_StartAction
-			VMStartDelay  	= $($state_lines).StartDelay
-			VMStartOrder  	= $($state_lines).StartOrder
-			VMStopDelay		= $($state_lines).StopDelay
-			VMHeartBeat		= $vm_VMHeartBeat
-		}
-		$results += New-Object PSObject -Property $details
+	Begin {
+		#Очистим файл, если он есть
+		New-Item -Path $FileName -ItemType "file" -Force | Out-Null
+
 	}
-	#Выгрузим получившиеся данные в csv
-	$results | Select-Object VC, VMHost, VMName, VMStartAction, VMStartOrder, VMStartDelay, VMStopDelay, VMHeartBeat |sort VC, VMHost, VMStartAction, VMStartOrder |export-csv -Delimiter ";" -Append -Path $FileName -NoTypeInformation 
-	Disconnect-VIServer $esxi_server -Confirm:$False
+	Process {
+		ForEach ($vi_server in $esxi_server) {
+			Write-Host "Обрабатываем",$vi_server
+			#Подключимся к серверу
+			#Connect-VIServer -Server $esxi_server -Protocol https -User $esxi_username -Password $esxi_userpassword | Out-Null
+			Connect-VIServer -Server $vi_server -Protocol https -Credential ( Get-Credential) | Out-Null
+			#Перебор всех VM
+			$results = @() 
+			ForEach ($vm in (Get-VM)) {
+				$state_lines = Get-VMStartPolicy $vm
+				$vm_StartAction = Get-VMStartPolicy $vm | Select-Object -ExpandProperty StartAction
+				$vm_VMHeartBeat = Get-VMStartPolicy $vm | Select-Object -ExpandProperty WaitForHeartBeat
+				$details = @{   
+					VC				= $vi_server
+					VMHost 		 	= $vm.vmhost
+					VMName	      	= $vm.Name
+					VMStartAction	= $vm_StartAction
+					VMStartDelay  	= $($state_lines).StartDelay
+					VMStartOrder  	= $($state_lines).StartOrder
+					VMStopDelay		= $($state_lines).StopDelay
+					VMHeartBeat		= $vm_VMHeartBeat
+				}
+				$results += New-Object PSObject -Property $details
+			}
+			#Выгрузим получившиеся данные в csv
+			$results | Select-Object VC, VMHost, VMName, VMStartAction, VMStartOrder, VMStartDelay, VMStopDelay, VMHeartBeat |sort VC, VMHost, VMStartAction, VMStartOrder |export-csv -Delimiter ";" -Append -Path $FileName -NoTypeInformation 
+			Disconnect-VIServer $vi_server -Confirm:$False
+		}
+	}
 }
 
 function Set-VMAutostartOrder {
 	param (
-		[parameter(Mandatory=$true,ValueFromPipeline=$true)]
-        [string[]]$esxi_server,
-		
 		[parameter(Mandatory=$true,ValueFromPipeline=$false)]
         [string]$FileName
 	)
